@@ -22,7 +22,7 @@ class GradientDescent(np.ndarray):
         self.gradient_step = getattr(obj, 'gradient_step', None)
         self.minima = getattr(obj, 'minima', None)
 
-    def gradient_descent_step(self, gradient_current, rate_parameter=0.05, previous_rate_parameter = 0.001, momentum_parameter=0.4, noise_parameter=0.001, noise_interval = 1000, noise_sigma=1):
+    def gradient_descent_step(self, gradient_current, rate_parameter=0.05, previous_rate_parameter = 0.001, momentum_parameter=0.75, noise_parameter=0.001, noise_interval = 10000, noise_sigma=1):
         if noise_parameter == 0:
             noise = 0
         else:
@@ -39,7 +39,7 @@ class GradientDescent(np.ndarray):
         return x
     
 def gradient_descent_from_function(dim, gradf, f, num_attempts=5, xinit_radius=10, error_flag = 1e-8, max_iter = 1e6, verbose=False,
-                                   rate_parameter=0.05, previous_rate_parameter = 0.001, momentum_parameter=0.4, noise_parameter=0.001, noise_interval = 1000, noise_sigma=1):
+                                   rate_parameter=0.05, previous_rate_parameter = 0.001, momentum_parameter=0.75, noise_parameter=0.001, noise_interval = 10000, noise_sigma=1):
     minima = []
     for iter in range(num_attempts):
         xinit = np.random.uniform(-xinit_radius,xinit_radius,dim)
@@ -89,7 +89,7 @@ if __name__ == '__main__':
     test_results = []
     
     minima0, minima_value0 = [1,-1], 1
-    minima, minima_value = gradient_descent_from_function(2,gradf0,f0,verbose=True)
+    minima, minima_value = gradient_descent_from_function(2, gradf0, f0, verbose=True)
     print(minima, minima_value)
     print(minima0,minima_value0)
     test_result = evaluate_error_grad_desc(minima_value0,minima_value)
@@ -129,7 +129,7 @@ if __name__ == '__main__':
     gradf2 = sp.lambdify(args2,gradf2,"numpy")
 
     minima2, minima_value2 = [8,0,0,8,5], 80085
-    minima, minima_value = gradient_descent_from_function(5, gradf2, f2, rate_parameter=0.0005, previous_rate_parameter = 0.00001, momentum_parameter=0.9, noise_parameter=0.00001, noise_interval= 100000, verbose=True)
+    minima, minima_value = gradient_descent_from_function(5, gradf2, f2, rate_parameter=0.0005, previous_rate_parameter = 0.00001, momentum_parameter=0.95, noise_parameter=1, noise_interval=100000, noise_sigma=2, verbose=True)
     print(minima, minima_value)
     print(minima2,minima_value2)
     test_result = evaluate_error_grad_desc(minima_value2,minima_value)
