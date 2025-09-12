@@ -1,60 +1,199 @@
 import numpy as np
+from typing import Callable, List, Tuple, Union, Any
+
 
 class GradientDescent(np.ndarray):
-    def __new__(cls, input_array):
-        # Ensure it's a NumPy array, and force 1D
+    """
+    A subclass of numpy.ndarray that stores additional information
+    useful for gradient descent optimization, such as current and previous
+    gradients, iteration count, and a history of minima.
+
+    Attributes
+    ----------
+    gradient_current : np.ndarray
+        The current gradient vector (same shape as the input array).
+    gradient_previous : np.ndarray
+        The previous gradient vector.
+    gradient_step : int
+        Counter for the number of gradient descent steps taken.
+    minima : list
+        A list to store discovered minima during optimization.
+    """
+
+    gradient_current: np.ndarray
+    gradient_previous: np.ndarray
+    gradient_step: int
+    minima: List[Any]
+
+    def __new__(cls, input_array: Union[np.ndarray, List[float]]) -> "GradientDescent":
+        """
+        Create a new GradientDescent object from an input array.
+
+        Parameters
+        ----------
+        input_array : array-like
+            The initial values for the optimization variables.
+
+        Returns
+        -------
+        GradientDescent
+            An instance of GradientDescent.
+        """
         arr = np.asarray(input_array).reshape(-1)
         obj = arr.view(cls)
 
-        # Initialize attributes as arrays of zeros
         obj.gradient_current = np.zeros_like(arr, dtype=float)
         obj.gradient_previous = np.zeros_like(arr, dtype=float)
         obj.gradient_step = 0
         obj.minima = []
         return obj
 
-    def __array_finalize__(self, obj):
-        if obj is None: 
+    def __array_finalize__(self, obj: Any) -> None:
+        """
+        Finalize creation of the array, ensuring attributes are preserved
+        when new views or slices are created.
+
+        Parameters
+        ----------
+        obj : Any
+            The object being viewed or sliced from.
+        """
+        if obj is None:
             return
-        # Copy attributes from the source object if they exist
         self.gradient_current = getattr(obj, 'gradient_current', None)
         self.gradient_previous = getattr(obj, 'gradient_previous', None)
         self.gradient_step = getattr(obj, 'gradient_step', None)
         self.minima = getattr(obj, 'minima', None)
 
-    def gradient_descent_step(self, gradient_current, rate_parameter=0.05, previous_rate_parameter = 0.001, momentum_parameter=0.75, noise_parameter=0.001, noise_interval = 10000, noise_sigma=1):
+    def gradient_descent_step(
+        self,
+        gradient_current: np.ndarray,
+        rate_parameter: float = 0.05,
+        previous_rate_parameter: float = 0.001,
+        momentum_parameter: float = 0.75,
+        noise_parameter: float = 0.001,
+        noise_interval: int = 10000,
+        noise_sigma: float = 1.0,
+    ) -> "GradientDescent":
+        """
+        Perform one gradient descent update step.
+
+        Parameters
+        ----------
+        gradient_current : np.ndarray
+            The current gradient vector.
+        rate_parameter : float, optional
+            Step size for the current gradient (default 0.05).
+        previous_rate_parameter : float, optional
+            Weight for the previous gradient (default 0.001).
+        momentum_parameter : float, optional
+            Momentum coefficient (default 0.75).
+        noise_parameter : float, optional
+            Scale factor for random noise injection (default 0.001).
+        noise_interval : int, optional
+            Interval of steps at which noise is added (default 10000).
+        noise_sigma : float, optional
+            Standard deviation of the Gaussian noise (default 1.0).
+
+        Returns
+        -------
+        GradientDescent
+            Updated parameters after one gradient descent step.
+        """
         if noise_parameter == 0:
             noise = 0
         else:
-            if (self.gradient_step + 1)% noise_interval == 0:
-                # noise_parameter = noise_parameter*(np.sin(noise_wavelength * self.gradient_step / (2 * np.pi))**5)
+            if (self.gradient_step + 1) % noise_interval == 0:
                 noise = np.random.normal(0, noise_sigma, self.size)
             else:
                 noise = 0
-        x = self - rate_parameter*gradient_current - previous_rate_parameter*self.gradient_previous
-        x = x + momentum_parameter*(x-self) + noise_parameter*noise
+
+        x = self - rate_parameter * gradient_current - previous_rate_parameter * self.gradient_previous
+        x = x + momentum_parameter * (x - self) + noise_parameter * noise
         x = GradientDescent(x)
         x.gradient_previous = gradient_current
         x.gradient_step = self.gradient_step + 1
         return x
-    
-def gradient_descent_from_function(dim, gradf, f, num_attempts=5, xinit_radius=10, error_flag = 1e-8, max_iter = 1e6, verbose=False,
-                                   rate_parameter=0.05, previous_rate_parameter = 0.001, momentum_parameter=0.75, noise_parameter=0.001, noise_interval = 10000, noise_sigma=1):
-    minima = []
-    for iter in range(num_attempts):
-        xinit = np.random.uniform(-xinit_radius,xinit_radius,dim)
+
+
+def gradient_descent_from_function(
+    dim: int,
+    gradf: Callable[..., np.ndarray],
+    f: Callable[..., float],
+    num_attempts: int = 5,
+    xinit_radius: float = 10,
+    error_flag: float = 1e-8,
+    max_iter: int = int(1e6),
+    verbose: bool = False,
+    rate_parameter: float = 0.05,
+    previous_rate_parameter: float = 0.001,
+    momentum_parameter: float = 0.75,
+    noise_parameter: float = 0.001,
+    noise_interval: int = 10000,
+    noise_sigma: float = 1.0,
+) -> Tuple[GradientDescent, float]:
+    """
+    Run gradient descent optimization on a given function.
+
+    Parameters
+    ----------
+    dim : int
+        Dimension of the input space.
+    gradf : Callable
+        Function that computes the gradient of f.
+    f : Callable
+        Objective function to minimize.
+    num_attempts : int, optional
+        Number of random initializations (default 5).
+    xinit_radius : float, optional
+        Range for uniform random initialization (default 10).
+    error_flag : float, optional
+        Convergence tolerance for gradient norm (default 1e-8).
+    max_iter : int, optional
+        Maximum iterations allowed (default 1e6).
+    verbose : bool, optional
+        Whether to print progress information (default False).
+    rate_parameter : float, optional
+        Learning rate (default 0.05).
+    previous_rate_parameter : float, optional
+        Weight for previous gradient (default 0.001).
+    momentum_parameter : float, optional
+        Momentum coefficient (default 0.75).
+    noise_parameter : float, optional
+        Scale of injected noise (default 0.001).
+    noise_interval : int, optional
+        Interval between noise injections (default 10000).
+    noise_sigma : float, optional
+        Standard deviation of injected Gaussian noise (default 1.0).
+
+    Returns
+    -------
+    minima : GradientDescent
+        The position of the minimum found.
+    minima_value : float
+        The value of the function at the minimum.
+    """
+    minima: List[GradientDescent] = []
+    for _ in range(num_attempts):
+        xinit = np.random.uniform(-xinit_radius, xinit_radius, dim)
         x = GradientDescent(xinit)
 
-        error = 1
+        error = 1.0
         try:
             while error > error_flag and x.gradient_step < max_iter:
-                # print(x)
                 gradfx = gradf(*x)
                 grad_norm = np.linalg.norm(gradfx)
-                if grad_norm > 1.0:   # threshold
+                if grad_norm > 1.0:  # gradient clipping
                     gradfx = gradfx / grad_norm
-                xnew = x.gradient_descent_step(gradfx, rate_parameter=rate_parameter, previous_rate_parameter = previous_rate_parameter, momentum_parameter=momentum_parameter, noise_parameter=noise_parameter, noise_interval=noise_interval, noise_sigma=noise_sigma)
-                # error = np.linalg.norm(x-xnew)
+                xnew = x.gradient_descent_step(
+                    gradfx,
+                    rate_parameter=rate_parameter,
+                    previous_rate_parameter=previous_rate_parameter,
+                    momentum_parameter=momentum_parameter,
+                    noise_parameter=noise_parameter,
+                    noise_interval=noise_interval,
+                    noise_sigma=noise_sigma,
+                )
                 error = grad_norm
                 x = xnew
             if verbose:
@@ -65,11 +204,12 @@ def gradient_descent_from_function(dim, gradf, f, num_attempts=5, xinit_radius=1
             continue
 
     minima_values = [f(*x) for x in minima]
-    minima_pos = np.argmin(minima_values)
+    minima_pos = int(np.argmin(minima_values))
     minima_value = minima_values[minima_pos]
     minima = minima[minima_pos]
 
     return minima, minima_value
+
 
 
 if __name__ == '__main__':
