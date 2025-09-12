@@ -3,26 +3,31 @@ import numpy as np
 import sympy as sp
 from gradient_descent import gradient_descent_from_function
 
-
-def assert_close(actual, expected, tol=1e-6):
-    """Helper for approximate comparison of arrays/lists."""
-    actual = np.array(actual, dtype=float).reshape(-1)
-    expected = np.array(expected, dtype=float).reshape(-1)
-    assert np.allclose(actual, expected, atol=tol), f"Expected {expected}, got {actual}"
+def assert_value_equal(minima_value, f, expected_min, tol=1e-8):
+    """
+    Check that the function value at the computed minimum matches
+    the true function value at the expected minimum.
+    """
+    true_value = f(*expected_min)
+    assert abs(minima_value - true_value) < tol, (
+        f"Expected f({expected_min})={true_value}, got {minima_value}"
+    )
 
 
 def test_quartic_minimum():
     def f0(x, y): return (x - 1) ** 4 + (y + 1) ** 4 + 1
     def gradf0(x, y): return np.array([4 * (x - 1) ** 3, 4 * (y + 1) ** 3])
 
-    minima, value = gradient_descent_from_function(
+    expected_min = [1, -1]
+
+    minima, minima_value = gradient_descent_from_function(
         2, gradf0, f0,
         rate_parameter=0.7,
         previous_rate_parameter=0.1,
         momentum_parameter=0.7,
     )
-    assert_close(minima, [1, -1], tol=1e-3)
-    assert abs(value - 1) < 1e-3
+
+    assert_value_equal(minima_value, f0, expected_min, tol=1e-8)
 
 
 def test_simple_quadratic():
@@ -33,9 +38,11 @@ def test_simple_quadratic():
     f1 = sp.lambdify([x1, x2], f1, "numpy")
     gradf1 = sp.lambdify([x1, x2], gradf1, "numpy")
 
-    minima, value = gradient_descent_from_function(2, gradf1, f1)
-    assert_close(minima, [0, 1], tol=1e-3)
-    assert abs(value - 0) < 1e-6
+    expected_min = [0, 1]
+
+    minima, minima_value = gradient_descent_from_function(2, gradf1, f1)
+
+    assert_value_equal(minima_value, f1, expected_min, tol=1e-8)
 
 
 def test_exponential_target():
@@ -52,7 +59,9 @@ def test_exponential_target():
     f2 = sp.lambdify([x1, x2, x3, x4, x5], f2, "numpy")
     gradf2 = sp.lambdify([x1, x2, x3, x4, x5], gradf2, "numpy")
 
-    minima, value = gradient_descent_from_function(
+    expected_min = [8, 0, 0, 8, 5]
+
+    minima, minima_value = gradient_descent_from_function(
         5, gradf2, f2,
         rate_parameter=0.0005,
         previous_rate_parameter=0.00001,
@@ -61,8 +70,8 @@ def test_exponential_target():
         noise_interval=100000,
         noise_sigma=2,
     )
-    assert_close(minima, [8, 0, 0, 8, 5], tol=1e-1)
-    assert abs(value - 80085) < 1e-1
+
+    assert_value_equal(minima_value, f2, expected_min, tol=1e-8)
 
 
 def test_maximization():
@@ -73,7 +82,9 @@ def test_maximization():
     f3 = sp.lambdify([x1], f3, "numpy")
     gradf3 = sp.lambdify([x1], gradf3, "numpy")
 
-    minima, value = gradient_descent_from_function(
+    expected_max = [6]
+
+    minima, minima_value = gradient_descent_from_function(
         1, gradf3, f3,
         num_attempts=15,
         xinit_radius=15,
@@ -84,5 +95,5 @@ def test_maximization():
         noise_parameter=0.000001,
         noise_interval=50000,
     )
-    assert_close(minima, [6], tol=1e-1)
-    assert abs(value - 6) < 1e-1
+
+    assert_value_equal(minima_value, f3, expected_max, tol=1e-8)
