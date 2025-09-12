@@ -224,6 +224,7 @@ def gradient_descent_from_function(
     return minimum, minimum_value
 
 
+# Obsolete manual tests, replaced with pytest tests
 if __name__ == '__main__':
     def evaluate_error_grad_desc(minimum, minimum_grad, tol = 1e-8):
         error = np.linalg.norm(minimum-minimum_grad)
