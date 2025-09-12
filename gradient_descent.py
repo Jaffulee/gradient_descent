@@ -68,6 +68,7 @@ class GradientDescent(np.ndarray):
     def gradient_descent_step(
         self,
         gradient_current: np.ndarray,
+        descent: bool = True,
         rate_parameter: float = 0.05,
         previous_rate_parameter: float = 0.001,
         momentum_parameter: float = 0.75,
@@ -82,6 +83,8 @@ class GradientDescent(np.ndarray):
         ----------
         gradient_current : np.ndarray
             The current gradient vector.
+        descent : bool
+            Whether the algorithm is gradient descent (True) or ascent (False) (default True).
         rate_parameter : float, optional
             Step size for the current gradient (default 0.05).
         previous_rate_parameter : float, optional
@@ -107,8 +110,11 @@ class GradientDescent(np.ndarray):
                 noise = np.random.normal(0, noise_sigma, self.size)
             else:
                 noise = 0
-
-        x = self - rate_parameter * gradient_current - previous_rate_parameter * self.gradient_previous
+        if descent:
+            descent_flag = 1
+        else:
+            descent_flag = -1
+        x = self - descent_flag * rate_parameter * gradient_current - descent_flag * previous_rate_parameter * self.gradient_previous
         x = x + momentum_parameter * (x - self) + noise_parameter * noise
         x = GradientDescent(x)
         x.gradient_previous = gradient_current
@@ -125,6 +131,7 @@ def gradient_descent_from_function(
     error_flag: float = 1e-8,
     max_iter: int = int(1e6),
     verbose: bool = False,
+    descent: bool = True,
     rate_parameter: float = 0.05,
     previous_rate_parameter: float = 0.001,
     momentum_parameter: float = 0.75,
@@ -187,6 +194,7 @@ def gradient_descent_from_function(
                     gradfx = gradfx / grad_norm
                 xnew = x.gradient_descent_step(
                     gradfx,
+                    descent = descent,
                     rate_parameter=rate_parameter,
                     previous_rate_parameter=previous_rate_parameter,
                     momentum_parameter=momentum_parameter,
@@ -202,14 +210,18 @@ def gradient_descent_from_function(
         except Exception as e:
             print(e)
             continue
+    
+        minima_values = [f(*x) for x in minima]
 
-    minima_values = [f(*x) for x in minima]
-    minima_pos = int(np.argmin(minima_values))
-    minima_value = minima_values[minima_pos]
-    minima = minima[minima_pos]
+        if descent:
+            minima_pos = int(np.argmin(minima_values))
+        else:
+            minima_pos = int(np.argmax(minima_values))
 
-    return minima, minima_value
+        minimum_value = minima_values[minima_pos]
+        minimum = minima[minima_pos]
 
+    return minimum, minimum_value
 
 
 if __name__ == '__main__':
@@ -220,6 +232,7 @@ if __name__ == '__main__':
         print(result)
         return result
 
+    # Test
     def f0(x,y):
         return (x-1)**4 + (y+1)**4 + 1    
 
@@ -229,7 +242,7 @@ if __name__ == '__main__':
     test_results = []
     
     minima0, minima_value0 = [1,-1], 1
-    minima, minima_value = gradient_descent_from_function(2, gradf0, f0, verbose=True)
+    minima, minima_value = gradient_descent_from_function(2, gradf0, f0, rate_parameter=0.7, previous_rate_parameter = 0.1, momentum_parameter=0.7, verbose=True)
     print(minima, minima_value)
     print(minima0,minima_value0)
     test_result = evaluate_error_grad_desc(minima_value0,minima_value)
@@ -240,6 +253,7 @@ if __name__ == '__main__':
     import sympy as sp
     x1,x2,x3,x4,x5 = sp.symbols('x1 x2 x3 x4 x5', real=True)
 
+    # Test
     args1 = [x1,x2]
     f1 = sp.Matrix([(x1+x2 - 1)**2 + (x1-x2 + 1)**2])
     gradf1 = f1.jacobian(args1)
@@ -248,13 +262,14 @@ if __name__ == '__main__':
     gradf1 = sp.lambdify(args1,gradf1,"numpy")
 
     minima1, minima_value1 = [0,1], 0
-    minima, minima_value = gradient_descent_from_function(2,gradf1,f1,verbose=True)
+    minima, minima_value = gradient_descent_from_function(2,gradf1,f1, verbose=True)
     print(minima, minima_value)
     print(minima1,minima_value1)
     test_result = evaluate_error_grad_desc(minima_value1,minima_value)
     print(test_result)
     test_results.append(test_result)
 
+    # Test
     args2 = [x1,x2,x3,x4,x5]
     f2 = sp.Matrix([(2**x1-2**8)**2 +
                     (2**x2-2**0)**2 +
@@ -276,17 +291,21 @@ if __name__ == '__main__':
     print(test_result)
     test_results.append(test_result)
 
+    # Test
+    args3 = [x1]
+    f3 = sp.Matrix([-((x1-6)**2)*(((2**x1)+1)**2)+6])
+    gradf3 = f3.jacobian(args3)
+
+    f3 = sp.lambdify(args3,f3,"numpy")
+    gradf3 = sp.lambdify(args3,gradf3,"numpy")
+
+    minima3, minima_value3 = [6], 6
+    minima, minima_value = gradient_descent_from_function(1, gradf3, f3 , num_attempts=15, xinit_radius=15, descent=False, rate_parameter=0.00005, previous_rate_parameter = 0.00001, momentum_parameter=0.97, noise_parameter= 0.000001, noise_interval=50000,verbose=True)
+    print(minima, minima_value)
+    print(minima3,minima_value3)
+    test_result = evaluate_error_grad_desc(minima_value3,minima_value)
+    print(test_result)
+    test_results.append(test_result)
+
     print("\nTest results:")
     print(list(enumerate(test_results)))
-
-
-
-
-
-
-
-
-
-
-
-
