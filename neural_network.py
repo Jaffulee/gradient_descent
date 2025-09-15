@@ -123,7 +123,14 @@ class TensorJacobian(np.ndarray):
         if tensor_type_denominator1  != tensor_type_numerator2:
             raise ValueError('Tensor dimensions do not align')
         einsum_string = _get_einsum_string_for_mul_tensor_jacobian(self.tensor_type_numerator, tensor_type_denominator1, tensor_type_numerator2 , obj2.tensor_type_denominator)
-        result = np.einsum(einsum_string, self, obj2)
+        try:
+            result = np.einsum(einsum_string, self, obj2)
+        except ValueError as e:
+            print("EINSUM DEBUG")
+            print("  einsum:", einsum_string)
+            print("  self.shape:", self.shape, "types", self.tensor_type_numerator, self.tensor_type_denominator)
+            print("  obj2.shape:", obj2.shape, "types", obj2.tensor_type_numerator, obj2.tensor_type_denominator)
+            raise
         return TensorJacobian(result, self.tensor_type_numerator, obj2.tensor_type_denominator)
 
 def _get_einsum_string_for_mul_tensor_jacobian(tensor_type_numerator1 : List[int] , tensor_type_denominator1 : List[int], tensor_type_numerator2 : List[int] , tensor_type_denominator2 : List[int]):
@@ -238,14 +245,14 @@ def get_DZDW(W, A):
     mW = W.shape[1]
     nZ = nW
     mZ = A.shape[1]
-    DZDY = np.zeros((nZ, mZ, mW, nW))
+    DZDW = np.zeros((nZ, mZ, mW, nW))
     for i in range(nZ):
         for j in range(mZ):
             for l in range(mW):
                 for k in range(nW):
                     if i==k:
-                        DZDY[i][j][l][k] = A[l][j]
-    return TensorJacobian(DZDY, [1,1], [1,1])
+                        DZDW[i][j][l][k] = A[l][j]
+    return TensorJacobian(DZDW, [1,1], [1,1])
 
 def get_DZDA(W, A):
     '''
@@ -276,6 +283,66 @@ def get_DZDb(b, Z):
                         DZDb[i][j][k] = 1
     return TensorJacobian(DZDb, [1,1], [1,0])
 
+def back_propagate(X, Yhat, As, Zs, Ws, bs, activation_function = 'sigmoid'):
+    layers = len(As)
+    if layers != len(bs):
+        raise ValueError('Bad size As and bs')
+    DWDEs = []
+    DWDbs = []
+
+    Y = As[-1]
+    ZL = Zs[-1]
+    WL = Ws[-1]
+    ALminus1 = As[-2]
+    bL = bs[-1]
+    DEDY = get_DEDY(Y, Yhat)
+    DSLDZL = get_DSDZ(ZL, activation_function= 'sigmoid')
+    DZLDWL = get_DZDW(WL,ALminus1)
+    DZLDbL = get_DZDb(bL,ZL)
+
+    DEDZL = DEDY * DSLDZL
+
+    DEDWL = DEDZL * DZLDWL
+    DEDbL = DEDZL * DZLDbL
+
+    DWDEs.append(DEDWL)
+    DWDbs.append(DEDbL)
+
+    DEDZi = DEDZL
+    for layer in range(layers - 1):
+            print(layer)
+            Zi = Zs[-layer-2]
+            Wi = Ws[-layer-2]
+            Ai = As[-layer-2]
+            Wiplus1 = Ws[-layer-1]
+            if layer == layers - 2:
+                Aiminus1 = X
+            else:
+                Aiminus1 = As[-layer-3]
+            bi = bs[-layer-2]
+
+            DZiplus1DAi = get_DZDA(Wiplus1,Ai)
+            DSiDZi = get_DSDZ(Zi,activation_function= 'sigmoid')
+
+            print(DZiplus1DAi.shape)
+            print(DSiDZi.shape)
+            DEmid = DZiplus1DAi * DSiDZi
+
+            DZiDWi = get_DZDW(Wi,Aiminus1)
+            DZiDbi = get_DZDb(bi,Zi)
+
+            DEDZi = DEDZi * DEmid
+
+            DEDWi = DEDZi * DZiDWi
+            DEDbi = DEDZi * DZiDbi
+
+            DWDEs.append(DEDWi)
+            DWDbs.append(DEDbi)
+            DWDEs.reverse()
+            DWDbs.reverse()
+
+    return DWDEs, DWDbs
+
     
 if __name__ == "__main__":
     a = np.arange(2*4*5).reshape(2,4,5)
@@ -300,19 +367,27 @@ if __name__ == "__main__":
     layer_node_nums = [5,2,3,2]
     Ws, bs = init_weights([5,2,3,2],1)
     for i, W in enumerate(Ws):
-        print(W)
-        print(bs[i])
+        # print(W)
+        # print(bs[i])
+        print(W.shape)
     
     print('testing forward prop')
 
     X = np.arange(5*4).reshape(5,4)
     As, Zs = forward_propagate(X, Ws, bs, 'sigmoid')
     for i, A in enumerate(As):
-        print(A)
-        print(Zs[i])
+        # print(A)
+        # print(Zs[i])
+        print(A.shape)
     
     Ws, bs = init_weights([5,2,3,2],1)
     As2, Zs = forward_propagate(X, Ws, bs, 'sigmoid')
+
+    DWDEs, DWDbs = back_propagate(X, As2[-1], As, Zs, Ws, bs, activation_function = 'sigmoid')
+
+    for i, DWDE in enumerate(DWDEs):
+        print(DWDE)
+        print(DWDbs[i])
 
 
     
