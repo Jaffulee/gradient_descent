@@ -2,6 +2,19 @@ import numpy as np
 from typing import Callable, List, Tuple, Union, Any
 from string import ascii_letters
 
+class ActivationFunctions:
+    functions = {
+        'sigmoid': lambda x: 1 / (1 + np.exp(-x)),
+        'tanh': np.tanh,
+        'relu': lambda x: np.maximum(0, x)
+    }
+
+    @classmethod
+    def get(cls, name: str):
+        if name not in cls.functions:
+            raise ValueError(f"Unknown activation function: {name}")
+        return cls.functions[name]
+
 
 class TensorJacobian(np.ndarray):
     """
@@ -85,6 +98,41 @@ def _get_einsum_string_for_mul_tensor_jacobian(tensor_type_numerator1 : List[int
     right_string = letters[0:tensor_dim_denominator2]
     return left_string + mid_string + ',' + mid_string_swap +  right_string + '->' + left_string + right_string
 
+def init_weights(layer_node_nums: List[int], radius: float = 1):
+
+    layers = len(layer_node_nums)
+    Ws = []
+    bs = []
+    for layer, layer_node_num in enumerate(layer_node_nums):
+        if layer == 0:
+            layer_node_num_previous = layer_node_num
+            continue
+        W = (np.random.rand(layer_node_num, layer_node_num_previous)-0.5)*radius
+        b = (np.random.rand(layer_node_num,1)-0.5)*radius
+        Ws.append(W)
+        bs.append(b)
+        layer_node_num_previous = layer_node_num
+        
+    return Ws, bs
+
+def forward_propagate(X, Ws: List[np.ndarray], bs: List[np.ndarray], activation_function = 'sigmoid'):
+    layers = len(Ws)
+    if layers != len(bs):
+        raise ValueError('Ws and Bs need to be of the same length; the number of layers excluding the input.')
+    As = []
+    Zs = []
+    previous_A = X
+    for layer in range(layers):
+        Wi = Ws[layer]
+        bi = bs[layer]
+        # Bi unneeded due to how numpy handles addition
+        Zi = Wi.dot(previous_A) + bi
+        Ai = ActivationFunctions.get(activation_function)(Zi)
+        previous_A = Ai
+        As.append(Ai)
+        Zs.append(Zi)
+    return As, Zs
+
     
 if __name__ == "__main__":
     a = np.arange(2*4*5).reshape(2,4,5)
@@ -100,6 +148,24 @@ if __name__ == "__main__":
     Ta = TensorJacobian(a,[1,0],[1,1])
     Tb = TensorJacobian(b,[1,1],[1,1])
     print(Ta*Tb)
+
+    A = np.arange(12).reshape(3,4)
+    B = np.arange(20).reshape(4,5)
+    print(A.dot(B))
+    print('nice')
+
+    layer_node_nums = [5,2,3,2]
+    Ws, bs = init_weights([5,2,3,2],1)
+    for i, W in enumerate(Ws):
+        print(W)
+        print(bs[i])
+    
+    print('testing forward prop')
+    X = np.arange(5*4).reshape(5,4)
+    As, Zs = forward_propagate(X, Ws, bs, 'sigmoid')
+    for i, A in enumerate(As):
+        print(A)
+        print(Zs[i])
 
     
 
