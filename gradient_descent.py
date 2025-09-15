@@ -103,6 +103,9 @@ class GradientDescent(np.ndarray):
         GradientDescent
             Updated parameters after one gradient descent step.
         """
+        # Make sure gradient shape matches
+        gradient_current = np.reshape(gradient_current, self.shape)
+
         if noise_parameter == 0:
             noise = 0
         else:
@@ -110,12 +113,11 @@ class GradientDescent(np.ndarray):
                 noise = np.random.normal(0, noise_sigma, self.shape)
             else:
                 noise = 0
-        if descent:
-            descent_flag = 1
-        else:
-            descent_flag = -1
+
+        descent_flag = 1 if descent else -1
         x = self - descent_flag * rate_parameter * gradient_current - descent_flag * previous_rate_parameter * self.gradient_previous
         x = x + momentum_parameter * (x - self) + noise_parameter * noise
+
         x = GradientDescent(x)
         x.gradient_previous = gradient_current
         x.gradient_step = self.gradient_step + 1

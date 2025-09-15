@@ -287,8 +287,8 @@ def back_propagate(X, Yhat, As, Zs, Ws, bs, activation_function = 'sigmoid'):
     layers = len(As)
     if layers != len(bs):
         raise ValueError('Bad size As and bs')
-    DWDEs = []
-    DWDbs = []
+    DEDWs = []
+    DEDbs = []
 
     Y = As[-1]
     ZL = Zs[-1]
@@ -305,43 +305,47 @@ def back_propagate(X, Yhat, As, Zs, Ws, bs, activation_function = 'sigmoid'):
     DEDWL = DEDZL * DZLDWL
     DEDbL = DEDZL * DZLDbL
 
-    DWDEs.append(DEDWL)
-    DWDbs.append(DEDbL)
+    DEDWL = DEDWL.T
+    DEDbL = DEDbL.T
+
+    DEDWs.append(DEDWL)
+    DEDbs.append(DEDbL)
 
     DEDZi = DEDZL
     for layer in range(layers - 1):
-            print(layer)
-            Zi = Zs[-layer-2]
-            Wi = Ws[-layer-2]
-            Ai = As[-layer-2]
-            Wiplus1 = Ws[-layer-1]
-            if layer == layers - 2:
-                Aiminus1 = X
-            else:
-                Aiminus1 = As[-layer-3]
-            bi = bs[-layer-2]
 
-            DZiplus1DAi = get_DZDA(Wiplus1,Ai)
-            DSiDZi = get_DSDZ(Zi,activation_function= 'sigmoid')
+        Zi = Zs[-layer-2]
+        Wi = Ws[-layer-2]
+        Ai = As[-layer-2]
+        Wiplus1 = Ws[-layer-1]
+        if layer == layers - 2:
+            Aiminus1 = X
+        else:
+            Aiminus1 = As[-layer-3]
+        bi = bs[-layer-2]
 
-            print(DZiplus1DAi.shape)
-            print(DSiDZi.shape)
-            DEmid = DZiplus1DAi * DSiDZi
+        DZiplus1DAi = get_DZDA(Wiplus1,Ai)
+        DSiDZi = get_DSDZ(Zi,activation_function= 'sigmoid')
 
-            DZiDWi = get_DZDW(Wi,Aiminus1)
-            DZiDbi = get_DZDb(bi,Zi)
+        DEmid = DZiplus1DAi * DSiDZi
 
-            DEDZi = DEDZi * DEmid
+        DZiDWi = get_DZDW(Wi,Aiminus1)
+        DZiDbi = get_DZDb(bi,Zi)
 
-            DEDWi = DEDZi * DZiDWi
-            DEDbi = DEDZi * DZiDbi
+        DEDZi = DEDZi * DEmid
 
-            DWDEs.append(DEDWi)
-            DWDbs.append(DEDbi)
-            DWDEs.reverse()
-            DWDbs.reverse()
+        DEDWi = DEDZi * DZiDWi
+        DEDbi = DEDZi * DZiDbi
 
-    return DWDEs, DWDbs
+        DEDWi = DEDWi.T
+        DEDbi = DEDbi.T
+
+        DEDWs.append(DEDWi)
+        DEDbs.append(DEDbi)
+    DEDWs.reverse()
+    DEDbs.reverse()
+
+    return DEDWs, DEDbs
 
     
 if __name__ == "__main__":
@@ -383,11 +387,11 @@ if __name__ == "__main__":
     Ws, bs = init_weights([5,2,3,2],1)
     As2, Zs = forward_propagate(X, Ws, bs, 'sigmoid')
 
-    DWDEs, DWDbs = back_propagate(X, As2[-1], As, Zs, Ws, bs, activation_function = 'sigmoid')
+    DEDWs, DEDbs = back_propagate(X, As2[-1], As, Zs, Ws, bs, activation_function = 'sigmoid')
 
-    for i, DWDE in enumerate(DWDEs):
-        print(DWDE)
-        print(DWDbs[i])
+    for i, DEDW in enumerate(DEDWs):
+        print(DEDW)
+        print(DEDbs[i])
 
 
     
