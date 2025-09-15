@@ -1,52 +1,152 @@
-# Gradient Descent Optimiser (with NumPy subclassing)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Gradient Descent Optimiser and Neural Network (Tensor-based Backpropagation)</title>
+</head>
+<body>
 
-This project contains a small Python implementation of a gradient descent optimiser, together with unit tests.  
-It demonstrates how to subclass `numpy.ndarray` to carry optimisation metadata and how to run optimisation against symbolic/numeric functions.
+<h1>Gradient Descent Optimiser and Neural Network (Tensor-based Backpropagation)</h1>
 
----
+<p>
+This project contains a Python implementation of a <strong>gradient descent optimiser</strong>, 
+a <strong>fully custom neural network framework</strong>, and a 
+<strong>generalised Jacobian class</strong> for handling tensor derivatives.  
+The network is trained on a simple example: fitting a sine wave using multilayer perceptrons.
+</p>
 
-## Files
+<hr>
 
-### `gradient_descent.py`
-Implements the optimiser:
+<h2>Features</h2>
 
-- **`class GradientDescent(np.ndarray)`**  
-  A subclass of NumPy arrays that represents optimisation parameters.  
-  It stores:
-  - `gradient_current` – the current gradient vector.
-  - `gradient_previous` – the previous gradient vector.
-  - `gradient_step` – the current iteration count.
-  - `minima` – a list for storing candidate minima.
+<h3>1. <code>gradient_descent.py</code></h3>
+<p>Implements the optimiser:</p>
 
-- **`gradient_descent_step(...)`**  
-  Performs one gradient descent (or ascent) step with:
-  - learning rate,
-  - momentum,
-  - optional noise injection,
-  - support for both minimisation and maximisation.
+<ul>
+  <li>
+    <strong><code>class GradientDescent(np.ndarray)</code></strong>  
+    <ul>
+      <li>Preserves the shape of optimisation variables.</li>
+      <li>Stores metadata (<code>gradient_current</code>, <code>gradient_previous</code>, <code>gradient_step</code>, <code>minima</code>).</li>
+      <li>Supports momentum and noise injection.</li>
+    </ul>
+  </li>
+  <li>
+    <strong><code>gradient_descent_step(...)</code></strong>  
+    Performs one update step:
+    <ul>
+      <li>Descent or ascent.</li>
+      <li>Learning rate control.</li>
+      <li>Momentum.</li>
+      <li>Optional Gaussian noise at fixed intervals.</li>
+    </ul>
+  </li>
+  <li>
+    <strong><code>gradient_descent_from_function(...)</code></strong>  
+    Optimises any function with a known gradient:
+    <ul>
+      <li>Multiple random restarts.</li>
+      <li>Gradient clipping.</li>
+      <li>Convergence based on gradient norm.</li>
+      <li>Maximisation as well as minimisation.</li>
+    </ul>
+  </li>
+</ul>
 
-- **`gradient_descent_from_function(...)`**  
-  Runs optimisation on a provided function and its gradient.  
-  Allows multiple random restarts (`num_attempts`) and returns:
-  - the minimum (or maximum) found,
-  - the corresponding function value.
+<hr>
 
-- **Manual test block (`if __name__ == "__main__":`)**  
-  Contains example runs with simple analytic functions.  
-  These are kept for illustration but are considered obsolete since pytest tests are provided separately.
+<h3>2. <code>neural_network.py</code></h3>
+<p>Implements a <strong>general neural network pipeline</strong>:</p>
 
----
+<ul>
+  <li><strong>Activation functions</strong>: <code>sigmoid</code>, <code>relu</code>, <code>tanh</code> (with derivatives), accessed via the <code>ActivationFunctions</code> registry.</li>
+  <li>
+    <strong><code>class TensorJacobian(np.ndarray)</code></strong>  
+    <ul>
+      <li>Generalised Jacobian supporting arbitrary tensor derivatives.</li>
+      <li>Stores numerator and denominator tensor types.</li>
+      <li>Overloads multiplication to compose tensor derivatives via Einstein summation.</li>
+      <li>Handles higher-order tensor calculus.</li>
+    </ul>
+  </li>
+  <li><strong>Forward propagation</strong>: arbitrary depth and width defined via <code>layer_node_nums</code>.</li>
+  <li><strong>Backward propagation (from tensor calculus)</strong>:  
+    <ul>
+      <li>Derives full Jacobians for each layer.</li>
+      <li>Computes gradients with respect to weights and biases (<code>DEDWs</code>, <code>DEDbs</code>).</li>
+      <li>Supports multiple hidden layers with arbitrary sizes.</li>
+    </ul>
+  </li>
+  <li><strong>Loss function</strong>: column-wise mean squared error  
+    <pre>
+E(Y, Yhat) = (1 / (2m)) * Σ ||yᵢ - ŷᵢ||²
+    </pre>
+    with derivative provided.
+  </li>
+</ul>
 
-### `test_gradient_descent.py`
-Contains **pytest-based unit tests**.  
-Each test checks that the function value returned by the optimiser matches the known minimum/maximum within tolerance `1e-8`.
+<hr>
 
-Tests included:
-- **`test_quartic_minimum`**: A quartic function with minimum at (1, -1).
-- **`test_simple_quadratic`**: A quadratic with minimum at (0, 1).
-- **`test_exponential_target`**: A higher-dimensional function involving powers of 2 with minimum at (8, 0, 0, 8, 5).
-- **`test_maximisation`**: A function with a known maximum at x = 6 (demonstrating gradient ascent mode).
+<h3>3. <code>neural_network_test.py</code></h3>
+<p>Demonstrates training the network to fit a sine wave:</p>
 
-Helper function:
-- **`assert_value_equal(...)`**  
-  Compares the returned minimum value against the true value of the function at the known extremum, enforcing tolerance of `1e-8`.
+<ul>
+  <li><strong>Dataset</strong>: random samples of sin(x) between 0 and 2π, rescaled to [0, 1].</li>
+  <li><strong>Model</strong>: multilayer perceptron, e.g. <code>[1, 10, 10, 1]</code>.</li>
+  <li><strong>Training loop</strong>:  
+    <ul>
+      <li>Gradient descent updates using the custom optimiser.</li>
+      <li>Forward pass on both training and curve points.</li>
+      <li>Plots: the true sine curve, training points, and network predictions at intervals.</li>
+    </ul>
+  </li>
+</ul>
+
+<hr>
+
+<h2>Example Run</h2>
+
+<pre>
+python neural_network_test.py
+</pre>
+
+<p>This will:</p>
+<ul>
+  <li>Initialise a random neural network.</li>
+  <li>Fit it to noisy sine samples.</li>
+  <li>Plot the true sine, training points, and iterative predictions.</li>
+</ul>
+
+<hr>
+
+<h2>Tests</h2>
+
+<p><code>test_gradient_descent.py</code> contains pytest-based unit tests:</p>
+<ul>
+  <li>Quartic function minimisation.</li>
+  <li>Simple quadratic minimum.</li>
+  <li>Higher-dimensional exponential minimisation.</li>
+  <li>Gradient ascent demonstration (maximisation).</li>
+</ul>
+
+<p>Tolerance for all tests: <strong>1e-8</strong>.</p>
+
+<pre>
+pytest
+</pre>
+
+<hr>
+
+<h2>Summary</h2>
+
+<p>This project demonstrates:</p>
+<ul>
+  <li>Subclassing NumPy arrays to store optimisation metadata.</li>
+  <li>Implementing gradient descent with momentum and noise.</li>
+  <li>Deriving a neural network training pipeline from first principles of tensor calculus.</li>
+  <li>Creating a generalised Jacobian (<code>TensorJacobian</code>) that supports higher-order tensor derivatives.</li>
+  <li>Training a custom neural network on a sine wave dataset.</li>
+</ul>
+
+</body>
+</html>

@@ -21,13 +21,13 @@ if __name__ == '__main__':
     X = x_curve.reshape(1, -1)      # evaluation inputs
 
     # Initialize network
-    layer_node_nums = [1, 3, 1]
+    layer_node_nums = [1, 10, 10 1]
     Ws, bs = nn.init_weights(layer_node_nums, 1)
 
     # Training loop
     plt.figure(figsize=(8, 5))
     plt.plot(x_curve, y_curve, label="sin(x)", color="blue")
-    plt.scatter(x_random, y_random, color="red", zorder=5, label="Random points")
+    plt.scatter(x_random, y_random, color="red", zorder=5, label="Training points")
 
     As, Zs = nn.forward_propagate(Xhat, Ws, bs, activation_function='sigmoid')
 
@@ -50,7 +50,10 @@ if __name__ == '__main__':
         if it%(iterations//10)==0:
             # print(As[-1])
             print(f"Iteration {it+1}")
-            plt.plot(x_curve, A_curve[-1].flatten(), label=f"Iteration {it+1}", alpha=0.6)
+            plt.plot(x_curve, A_curve[-1].flatten(), label=f"Iteration {it}", alpha=0.6)
+
+    print(f"Iteration {it}")
+    plt.plot(x_curve, A_curve[-1].flatten(), label=f"Iteration {it}", alpha=0.6)
 
     plt.xlabel("x")
     plt.ylabel("y")
