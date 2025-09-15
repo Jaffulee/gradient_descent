@@ -39,7 +39,7 @@ class GradientDescent(np.ndarray):
         GradientDescent
             An instance of GradientDescent.
         """
-        arr = np.asarray(input_array).reshape(-1)
+        arr = np.asarray(input_array)
         obj = arr.view(cls)
 
         obj.gradient_current = np.zeros_like(arr, dtype=float)
@@ -107,7 +107,7 @@ class GradientDescent(np.ndarray):
             noise = 0
         else:
             if (self.gradient_step + 1) % noise_interval == 0:
-                noise = np.random.normal(0, noise_sigma, self.size)
+                noise = np.random.normal(0, noise_sigma, self.shape)
             else:
                 noise = 0
         if descent:
@@ -186,9 +186,10 @@ def gradient_descent_from_function(
         x = GradientDescent(xinit)
 
         error = 1.0
+        minima: List[GradientDescent] = []
         try:
             while error > error_flag and x.gradient_step < max_iter:
-                gradfx = gradf(*x)
+                gradfx = gradf(*x.ravel())
                 grad_norm = np.linalg.norm(gradfx)
                 if grad_norm > 1.0:  # gradient clipping
                     gradfx = gradfx / grad_norm
@@ -210,8 +211,10 @@ def gradient_descent_from_function(
         except Exception as e:
             print(e)
             continue
-    
-        minima_values = [f(*x) for x in minima]
+        if not minima:
+            raise RuntimeError("All gradient descent attempts failed")
+
+        minima_values = [f(*x.ravel()) for x in minima]
 
         if descent:
             minima_pos = int(np.argmin(minima_values))
