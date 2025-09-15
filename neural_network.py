@@ -78,16 +78,19 @@ def _get_einsum_string_for_mul_tensor_jacobian(tensor_type_numerator1 : List[int
     left_string = letters[0:tensor_dim_numerator1]
     letters = letters[tensor_dim_numerator1:]
     mid_string = letters[0:tensor_dim_denominator1]
-    mid_string_reverse = mid_string[::-1]
+    mid_string1 = mid_string[:tensor_type_denominator1[0]]
+    mid_string2 = mid_string[tensor_type_denominator1[0]:]
+    mid_string_swap = mid_string2 + mid_string1
     letters = letters[tensor_dim_denominator1:]
     right_string = letters[0:tensor_dim_denominator2]
-    return left_string + mid_string + ',' + mid_string_reverse +  right_string + '->' + left_string + right_string
+    return left_string + mid_string + ',' + mid_string_swap +  right_string + '->' + left_string + right_string
 
     
 if __name__ == "__main__":
     a = np.arange(2*4*5).reshape(2,4,5)
     print(a)
     b = np.arange(4*5*9).reshape(5,4,3,3)
+    print(_get_einsum_string_for_mul_tensor_jacobian([1,0],[1,3],[1,3],[1,1]))
     c = np.einsum(_get_einsum_string_for_mul_tensor_jacobian([1,0],[1,1],[1,1],[1,1]),a,b)
     print(c)
     print(c.shape)
