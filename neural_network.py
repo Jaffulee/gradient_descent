@@ -1,21 +1,70 @@
 import numpy as np
-from typing import Callable, List, Tuple, Union, Any
+from typing import Callable, List, Tuple, Union, Dict, Any
 from string import ascii_letters
 
+
+def sigmoid(x: np.ndarray) -> np.ndarray:
+    """Sigmoid activation"""
+    return 1 / (1 + np.exp(-x))
+
+
+def sigmoid_derivative(x: np.ndarray) -> np.ndarray:
+    """Derivative of sigmoid wrt input x"""
+    s = sigmoid(x)
+    return s * (1 - s)
+
+
+def relu(x: np.ndarray) -> np.ndarray:
+    """ReLU activation"""
+    return np.maximum(0, x)
+
+
+def relu_derivative(x: np.ndarray) -> np.ndarray:
+    """Derivative of ReLU wrt input x"""
+    return (x > 0).astype(float)
+
+
+def tanh(x: np.ndarray) -> np.ndarray:
+    """Hyperbolic tangent activation"""
+    return np.tanh(x)
+
+
+def tanh_derivative(x: np.ndarray) -> np.ndarray:
+    """Derivative of tanh wrt input x"""
+    return 1 - np.tanh(x) ** 2
+
+
 class ActivationFunctions:
-    functions = {
-        'sigmoid': lambda x: 1 / (1 + np.exp(-x)),
-        'tanh': np.tanh,
-        'relu': lambda x: np.maximum(0, x)
+    """
+    Collection of activation functions and their derivatives.
+    Provides a clean API to fetch function/derivative pairs.
+    """
+    functions: Dict[str, Callable[[np.ndarray], np.ndarray]] = {
+        'sigmoid': sigmoid,
+        'relu': relu,
+        'tanh': tanh
+    }
+
+    derivatives: Dict[str, Callable[[np.ndarray], np.ndarray]] = {
+        'sigmoid': sigmoid_derivative,
+        'relu': relu_derivative,
+        'tanh': tanh_derivative
     }
 
     @classmethod
-    def get(cls, name: str):
+    def get(cls, name: str) -> Callable[[np.ndarray], np.ndarray]:
+        """Get activation function by name"""
         if name not in cls.functions:
             raise ValueError(f"Unknown activation function: {name}")
         return cls.functions[name]
 
-
+    @classmethod
+    def get_derivative(cls, name: str) -> Callable[[np.ndarray], np.ndarray]:
+        """Get derivative function by name"""
+        if name not in cls.derivatives:
+            raise ValueError(f"Unknown activation function: {name}")
+        return cls.derivatives[name]
+    
 class TensorJacobian(np.ndarray):
     """
     A subclass of numpy.ndarray that stores additional information
@@ -133,6 +182,100 @@ def forward_propagate(X, Ws: List[np.ndarray], bs: List[np.ndarray], activation_
         Zs.append(Zi)
     return As, Zs
 
+def columnwise_mse(Y: np.ndarray, Yhat: np.ndarray) -> float:
+    """
+    Compute the error function:
+    E(Y, Yhat) = (1 / (2m)) * sum(||y_i - yhat_i||^2) over columns
+    
+    Parameters
+    ----------
+    Y : np.ndarray
+        Predicted values, shape (n, m)
+    Yhat : np.ndarray
+        True values, shape (n, m)
+    
+    Returns
+    -------
+    float
+        Columnwise mean squared error divided by 2
+    """
+    if Y.shape != Yhat.shape:
+        raise ValueError("Y and Yhat must have the same shape")
+
+    m = Y.shape[1]  # number of columns
+    diff = Y - Yhat
+    squared_norms = np.sum(diff**2, axis=0)  # sum along rows (n)
+    error = np.sum(squared_norms) / (2 * m)
+    return error
+
+def get_DEDY(Y,Yhat):
+    if Y.shape != Yhat.shape:
+        raise ValueError("Y and Yhat must have the same shape")
+    m = Y.shape[1]  # number of columns
+    DEDY = (1/m)*(Y - Yhat).T
+    return TensorJacobian(DEDY, [0,0], [1,1])
+
+
+def get_DSDZ(Z, activation_function = 'sigmoid'):
+    nZ = Z.shape[0]
+    mZ = Z.shape[1]
+    nS = nZ
+    mS = mZ
+    DSDZ = np.zeros((nS, mS, mZ, nZ))
+    for i in range(nS):
+        for j in range(mS):
+            for l in range(mZ):
+                for k in range(nZ):
+                    if i==k and l==j:
+                        DSDZ[i][j][l][k] = ActivationFunctions.get_derivative(activation_function)(Z[k][l])
+    return TensorJacobian(DSDZ, [1,1], [1,1])
+
+def get_DZDW(W, A):
+    '''
+    Gets the derivative of Z = WA wrt W as a tensor
+    '''
+    nW = W.shape[0]
+    mW = W.shape[1]
+    nZ = nW
+    mZ = A.shape[1]
+    DZDY = np.zeros((nZ, mZ, mW, nW))
+    for i in range(nZ):
+        for j in range(mZ):
+            for l in range(mW):
+                for k in range(nW):
+                    if i==k:
+                        DZDY[i][j][l][k] = A[l][j]
+    return TensorJacobian(DZDY, [1,1], [1,1])
+
+def get_DZDA(W, A):
+    '''
+    Gets the derivative of Z = WA wrt A as a tensor
+    '''
+    nA = A.shape[0]
+    mA = A.shape[1]
+    nZ = W.shape[0]
+    mZ = mA
+    DZDA = np.zeros((nZ, mZ, mA, nA))
+    for i in range(nZ):
+        for j in range(mZ):
+            for l in range(mA):
+                for k in range(nA):
+                    if l==j:
+                        DZDA[i][j][l][k] = W[i][k]
+    return TensorJacobian(DZDA, [1,1], [1,1])
+
+def get_DZDb(b, Z):
+    nZ = Z.shape[0]
+    mZ = Z.shape[1]
+    nb = b.shape[0]
+    DZDb = np.zeros((nZ, mZ, nb))
+    for i in range(nZ):
+        for j in range(mZ):
+            for k in range(nb):
+                    if i==k:
+                        DZDb[i][j][k] = 1
+    return TensorJacobian(DZDb, [1,1], [1,0])
+
     
 if __name__ == "__main__":
     a = np.arange(2*4*5).reshape(2,4,5)
@@ -161,11 +304,16 @@ if __name__ == "__main__":
         print(bs[i])
     
     print('testing forward prop')
+
     X = np.arange(5*4).reshape(5,4)
     As, Zs = forward_propagate(X, Ws, bs, 'sigmoid')
     for i, A in enumerate(As):
         print(A)
         print(Zs[i])
+    
+    Ws, bs = init_weights([5,2,3,2],1)
+    As2, Zs = forward_propagate(X, Ws, bs, 'sigmoid')
+
 
     
 
