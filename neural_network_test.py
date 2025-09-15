@@ -21,7 +21,7 @@ if __name__ == '__main__':
     X = x_curve.reshape(1, -1)      # evaluation inputs
 
     # Initialize network
-    layer_node_nums = [1, 10, 10 1]
+    layer_node_nums = [1, 10, 1]
     Ws, bs = nn.init_weights(layer_node_nums, 1)
 
     # Training loop
