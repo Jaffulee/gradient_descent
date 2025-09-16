@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Gradient Descent Optimiser and Neural Network (Tensor-based Backpropagation)</title>
-</head>
+
 <body>
+<img width="1446" height="1292" alt="image" src="https://github.com/user-attachments/assets/9195d97a-044b-42e6-9f7d-a7036522a41e" />
+
 
 <h1>Gradient Descent Optimiser and Neural Network (Tensor-based Backpropagation)</h1>
 
