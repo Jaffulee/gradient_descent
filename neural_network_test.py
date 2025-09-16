@@ -115,7 +115,7 @@ if __name__ == '__main__':
     # Training setup
     activations = {
         'final_activation_function': 'identity',
-        'activation_function': 'sigmoid'
+        'activation_function': 'tanh'
     }
     As, Zs = nn.forward_propagate(T_train, Ws, bs, **activations)
 

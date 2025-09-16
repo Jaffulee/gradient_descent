@@ -265,7 +265,100 @@ def get_DEDY(Y,Yhat):
     DEDY = (1/m)*(Y - Yhat).T
     return TensorJacobian(DEDY, [0,0], [1,1])
 
-def get_DSDZL(Z, activation_function = 'softmax'):
+def get_DSDZL(Z, activation_function='softmax'):
+    if activation_function != 'softmax':
+        return get_DSDZ(Z, activation_function=activation_function)
+    else:
+        nZ, mZ = Z.shape
+        # shape (nZ, mZ)
+        S = ActivationFunctions.get(activation_function)(Z)
+
+        # For each column j, Jacobian is diag(s) - s s^T
+        # Build block-diagonal stack of Jacobians
+        DSsDZ = np.zeros((nZ, mZ, mZ, nZ))  # (i, j, l, k)
+
+        for j in range(mZ):
+            s = S[:, j].reshape(-1, 1)  # (nZ, 1)
+            J = np.diagflat(s) - s @ s.T  # (nZ, nZ)
+            # Fill slice j
+            DSsDZ[:, j, j, :] = J  # indices (i, j, l=j, k)
+
+        return TensorJacobian(DSsDZ, [1, 1], [1, 1])
+
+
+def get_DSDZ(Z, activation_function='sigmoid'):
+    nZ, mZ = Z.shape
+    act_deriv = ActivationFunctions.get_derivative(activation_function)(Z)  # (nZ, mZ)
+
+    # Place derivative along diagonal of Jacobian blocks
+    DSDZ = np.zeros((nZ, mZ, mZ, nZ))
+    for j in range(mZ):
+        DSDZ[:, j, j, :] = np.diag(act_deriv[:, j])
+
+    return TensorJacobian(DSDZ, [1, 1], [1, 1])
+
+
+def get_DZDW(W, A):
+    """
+    Derivative of Z = W A wrt W
+    Shapes:
+      W: (nW, mW)
+      A: (mW, mZ)
+      Result: (nZ, mZ, mW, nW) with Z = W A
+    """
+    nW, mW = W.shape
+    mZ = A.shape[1]
+    nZ = nW
+
+    # DZDW[i, j, l, k] = A[l, j] if i == k
+    # So: broadcast A into correct slots
+    DZDW = np.zeros((nZ, mZ, mW, nW))
+    for i in range(nW):
+        DZDW[i, :, :, i] = A.T  # shape (mZ, mW)
+
+    return TensorJacobian(DZDW, [1, 1], [1, 1])
+
+
+def get_DZDA(W, A):
+    """
+    Derivative of Z = W A wrt A
+    Shapes:
+      W: (nZ, nA)
+      A: (nA, mA)
+      Result: (nZ, mZ, mA, nA) with Z = W A
+    """
+    nA, mA = A.shape
+    nZ = W.shape[0]
+    mZ = mA
+
+    # DZDA[i, j, l, k] = W[i, k] if l == j
+    DZDA = np.zeros((nZ, mZ, mA, nA))
+    for j in range(mA):
+        DZDA[:, j, j, :] = W  # (nZ, nA)
+
+    return TensorJacobian(DZDA, [1, 1], [1, 1])
+
+
+def get_DZDb(b, Z):
+    """
+    Derivative of Z = W A + b wrt b
+    Shapes:
+      b: (nb, 1)
+      Z: (nZ, mZ)
+      Result: (nZ, mZ, nb)
+    """
+    nZ, mZ = Z.shape
+    nb = b.shape[0]
+
+    # DZDb[i, j, k] = 1 if i == k
+    DZDb = np.zeros((nZ, mZ, nb))
+    for i in range(nZ):
+        DZDb[i, :, i] = 1
+
+    return TensorJacobian(DZDb, [1, 1], [1, 0])
+
+
+def get_DSDZL_naive(Z, activation_function = 'softmax'):
     if activation_function != 'softmax':
         return get_DSDZ(Z,activation_function=activation_function)
     else:
@@ -287,7 +380,7 @@ def get_DSDZL(Z, activation_function = 'softmax'):
                                 DSsDZ[i][j][l][k] = -act(Z)[i,l]*act(Z)[k,l]
         return TensorJacobian(DSsDZ, [1,1], [1,1])
 
-def get_DSDZ(Z, activation_function = 'sigmoid'):
+def get_DSDZ_naive(Z, activation_function = 'sigmoid'):
     nZ = Z.shape[0]
     mZ = Z.shape[1]
     nS = nZ
@@ -302,7 +395,7 @@ def get_DSDZ(Z, activation_function = 'sigmoid'):
                         DSDZ[i][j][l][k] = act(Z[k][l])
     return TensorJacobian(DSDZ, [1,1], [1,1])
 
-def get_DZDW(W, A):
+def get_DZDW_naive(W, A):
     '''
     Gets the derivative of Z = WA wrt W as a tensor
     '''
@@ -319,7 +412,7 @@ def get_DZDW(W, A):
                         DZDW[i][j][l][k] = A[l][j]
     return TensorJacobian(DZDW, [1,1], [1,1])
 
-def get_DZDA(W, A):
+def get_DZDA_naive(W, A):
     '''
     Gets the derivative of Z = WA wrt A as a tensor
     '''
@@ -336,7 +429,7 @@ def get_DZDA(W, A):
                         DZDA[i][j][l][k] = W[i][k]
     return TensorJacobian(DZDA, [1,1], [1,1])
 
-def get_DZDb(b, Z):
+def get_DZDb_naive(b, Z):
     nZ = Z.shape[0]
     mZ = Z.shape[1]
     nb = b.shape[0]
