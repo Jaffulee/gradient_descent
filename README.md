@@ -4,14 +4,14 @@
 <body>
 <img width="1446" height="1292" alt="image" src="https://github.com/user-attachments/assets/9195d97a-044b-42e6-9f7d-a7036522a41e" />
 
-
 <h1>Gradient Descent Optimiser and Neural Network (Tensor-based Backpropagation)</h1>
 
 <p>
 This project contains a Python implementation of a <strong>gradient descent optimiser</strong>, 
 a <strong>fully custom neural network framework</strong>, and a 
 <strong>generalised Jacobian class</strong> for handling tensor derivatives.  
-The network is trained on a simple example: fitting a sine wave using multilayer perceptrons.
+The framework is built from scratch using <code>NumPy</code>, with tensor-calculus-based backpropagation, 
+and demonstrates training on toy datasets such as <strong>fitting a sine wave</strong> and a <strong>helix projection</strong>.
 </p>
 
 <hr>
@@ -34,9 +34,9 @@ The network is trained on a simple example: fitting a sine wave using multilayer
     <strong><code>gradient_descent_step(...)</code></strong>  
     Performs one update step:
     <ul>
-      <li>Descent or ascent.</li>
       <li>Learning rate control.</li>
-      <li>Momentum.</li>
+      <li>Descent or ascent.</li>
+      <li>Momentum support.</li>
       <li>Optional Gaussian noise at fixed intervals.</li>
     </ul>
   </li>
@@ -46,7 +46,7 @@ The network is trained on a simple example: fitting a sine wave using multilayer
     <ul>
       <li>Multiple random restarts.</li>
       <li>Gradient clipping.</li>
-      <li>Convergence based on gradient norm.</li>
+      <li>Convergence checks (gradient norm).</li>
       <li>Maximisation as well as minimisation.</li>
     </ul>
   </li>
@@ -58,20 +58,22 @@ The network is trained on a simple example: fitting a sine wave using multilayer
 <p>Implements a <strong>general neural network pipeline</strong>:</p>
 
 <ul>
-  <li><strong>Activation functions</strong>: <code>sigmoid</code>, <code>relu</code>, <code>tanh</code> (with derivatives), accessed via the <code>ActivationFunctions</code> registry.</li>
+  <li><strong>Activation functions</strong>: <code>sigmoid</code>, <code>relu</code>, <code>tanh</code>, <code>softmax</code>, <code>identity</code>.  
+    Each with corresponding derivatives, accessible via the <code>ActivationFunctions</code> registry.
+  </li>
   <li>
     <strong><code>class TensorJacobian(np.ndarray)</code></strong>  
     <ul>
       <li>Generalised Jacobian supporting arbitrary tensor derivatives.</li>
       <li>Stores numerator and denominator tensor types.</li>
-      <li>Overloads multiplication to compose tensor derivatives via Einstein summation.</li>
-      <li>Handles higher-order tensor calculus.</li>
+      <li>Overloads multiplication to compose tensor derivatives via Einstein summation (<code>einsum</code>).</li>
+      <li>Handles higher-order tensor calculus automatically.</li>
     </ul>
   </li>
   <li><strong>Forward propagation</strong>: arbitrary depth and width defined via <code>layer_node_nums</code>.</li>
-  <li><strong>Backward propagation (from tensor calculus)</strong>:  
+  <li><strong>Backward propagation</strong>:  
     <ul>
-      <li>Derives full Jacobians for each layer.</li>
+      <li>Derived from full tensor calculus (Jacobian compositions).</li>
       <li>Computes gradients with respect to weights and biases (<code>DEDWs</code>, <code>DEDbs</code>).</li>
       <li>Supports multiple hidden layers with arbitrary sizes.</li>
     </ul>
@@ -80,23 +82,44 @@ The network is trained on a simple example: fitting a sine wave using multilayer
     <pre>
 E(Y, Yhat) = (1 / (2m)) * Σ ||yᵢ - ŷᵢ||²
     </pre>
-    with derivative provided.
+    with derivative included.
   </li>
 </ul>
 
 <hr>
 
 <h3>3. <code>neural_network_test.py</code></h3>
-<p>Demonstrates training the network to fit a sine wave:</p>
+<p>Demonstrates training the network on two toy problems:</p>
 
 <ul>
-  <li><strong>Dataset</strong>: random samples of sin(x) between 0 and 2π, rescaled to [0, 1].</li>
-  <li><strong>Model</strong>: multilayer perceptron, e.g. <code>[1, 10, 10, 1]</code>.</li>
-  <li><strong>Training loop</strong>:  
+  <li><strong>Sine wave fitting</strong>:  
     <ul>
-      <li>Gradient descent updates using the custom optimiser.</li>
-      <li>Forward pass on both training and curve points.</li>
-      <li>Plots: the true sine curve, training points, and network predictions at intervals.</li>
+      <li>Random samples of sin(x) between 0 and 2π, rescaled to [0, 1].</li>
+      <li>Network: multilayer perceptron, e.g. <code>[1, 6, 1]</code>.</li>
+      <li>Plots:
+        <ul>
+          <li>True sine curve (black).</li>
+          <li>Training samples (red points, smaller markers for clarity).</li>
+          <li>Intermediate predictions every 10% of training (low opacity lines).</li>
+          <li>Final prediction (green line).</li>
+        </ul>
+      </li>
+      <li>Also plots training loss over iterations.</li>
+    </ul>
+  </li>
+  <li><strong>Helix projection fitting</strong>:  
+    <ul>
+      <li>Function: f(t) = [t cos t, t sin t].</li>
+      <li>Network: <code>[1, 10, 2]</code>.</li>
+      <li>Plots:
+        <ul>
+          <li>True XY helix projection (black).</li>
+          <li>Training samples (red points).</li>
+          <li>Intermediate predictions every 10% of training (low opacity lines).</li>
+          <li>Final NN prediction (green dashed line).</li>
+        </ul>
+      </li>
+      <li>Also plots training loss.</li>
     </ul>
   </li>
 </ul>
@@ -111,9 +134,10 @@ python neural_network_test.py
 
 <p>This will:</p>
 <ul>
-  <li>Initialise a random neural network.</li>
-  <li>Fit it to noisy sine samples.</li>
-  <li>Plot the true sine, training points, and iterative predictions.</li>
+  <li>Initialise random neural networks.</li>
+  <li>Train on sine and helix datasets.</li>
+  <li>Output progress logs (iterations + loss).</li>
+  <li>Generate plots for true functions, training data, predictions, and training losses.</li>
 </ul>
 
 <hr>
@@ -144,7 +168,8 @@ pytest
   <li>Implementing gradient descent with momentum and noise.</li>
   <li>Deriving a neural network training pipeline from first principles of tensor calculus.</li>
   <li>Creating a generalised Jacobian (<code>TensorJacobian</code>) that supports higher-order tensor derivatives.</li>
-  <li>Training a custom neural network on a sine wave dataset.</li>
+  <li>Training a custom neural network on both <strong>sine wave regression</strong> and <strong>helix projection</strong>.</li>
+  <li>Visualising training with snapshots of predictions and loss curves.</li>
 </ul>
 
 </body>
