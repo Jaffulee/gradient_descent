@@ -3,6 +3,29 @@ from typing import Callable, List, Tuple, Union, Dict, Any
 from string import ascii_letters
 
 
+import numpy as np
+
+def softmax(x: np.ndarray) -> np.ndarray:
+    """
+    Columnwise softmax activation.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        Input array of shape (n, m), where n is the number of classes 
+        and m is the number of examples.
+
+    Returns
+    -------
+    np.ndarray
+        Softmax applied columnwise, same shape as input.
+    """
+    # subtract max per column for numerical stability
+    x_shifted = x - np.max(x, axis=0, keepdims=True)
+    exp_x = np.exp(x_shifted)
+    return exp_x / np.sum(exp_x, axis=0, keepdims=True)
+
+
 def sigmoid(x: np.ndarray) -> np.ndarray:
     """Sigmoid activation"""
     return 1 / (1 + np.exp(-x))
@@ -13,6 +36,10 @@ def sigmoid_derivative(x: np.ndarray) -> np.ndarray:
     s = sigmoid(x)
     return s * (1 - s)
 
+def softmax_derivative(z: np.ndarray) -> np.ndarray:
+    """Jacobian of softmax wrt input z (vector version)."""
+    s = softmax(z).reshape(-1, 1)   # column vector
+    return np.diagflat(s) - s @ s.T
 
 def relu(x: np.ndarray) -> np.ndarray:
     """ReLU activation"""
@@ -42,13 +69,17 @@ class ActivationFunctions:
     functions: Dict[str, Callable[[np.ndarray], np.ndarray]] = {
         'sigmoid': sigmoid,
         'relu': relu,
-        'tanh': tanh
+        'tanh': tanh,
+        'softmax': softmax,
+        'identity': None
     }
 
     derivatives: Dict[str, Callable[[np.ndarray], np.ndarray]] = {
         'sigmoid': sigmoid_derivative,
         'relu': relu_derivative,
-        'tanh': tanh_derivative
+        'tanh': tanh_derivative,
+        'softmax': softmax_derivative,
+        'identity': None
     }
 
     @classmethod
@@ -171,19 +202,31 @@ def init_weights(layer_node_nums: List[int], radius: float = 1):
         
     return Ws, bs
 
-def forward_propagate(X, Ws: List[np.ndarray], bs: List[np.ndarray], activation_function = 'sigmoid'):
+def forward_propagate(X, Ws: List[np.ndarray], bs: List[np.ndarray], final_activation_function = 'softmax', activation_function = 'sigmoid'):
     layers = len(Ws)
+    if final_activation_function == 'softmax':
+        if Ws[-1].shape[0] == 1:
+            print('Warning: softmax does not work when number of nodes is 1. Swapping to sigmoid.')
+            final_activation_function = 'sigmoid'
+
     if layers != len(bs):
         raise ValueError('Ws and Bs need to be of the same length; the number of layers excluding the input.')
     As = []
     Zs = []
     previous_A = X
+    act = ActivationFunctions.get(activation_function)
     for layer in range(layers):
+
         Wi = Ws[layer]
         bi = bs[layer]
         # Bi unneeded due to how numpy handles addition
         Zi = Wi.dot(previous_A) + bi
-        Ai = ActivationFunctions.get(activation_function)(Zi)
+        if layer == layers - 1:
+            act = ActivationFunctions.get(final_activation_function)
+        if act:
+            Ai = act(Zi)
+        else:
+            Ai = Zi
         previous_A = Ai
         As.append(Ai)
         Zs.append(Zi)
@@ -222,6 +265,27 @@ def get_DEDY(Y,Yhat):
     DEDY = (1/m)*(Y - Yhat).T
     return TensorJacobian(DEDY, [0,0], [1,1])
 
+def get_DSDZL(Z, activation_function = 'softmax'):
+    if activation_function != 'softmax':
+        return get_DSDZ(Z,activation_function=activation_function)
+    else:
+        nZ = Z.shape[0]
+        mZ = Z.shape[1]
+        nS = nZ
+        mS = mZ
+        DSsDZ = np.zeros((nS, mS, mZ, nZ))
+        act = ActivationFunctions.get(activation_function)
+        for i in range(nS):
+            for j in range(mS):
+                for l in range(mZ):
+                    for k in range(nZ):
+                        if l==j:
+                            if i==k:
+                                DSsDZ[i][j][l][k] = act(Z)[i,l]*(1 - act(Z)[k,l])
+
+                            else:
+                                DSsDZ[i][j][l][k] = -act(Z)[i,l]*act(Z)[k,l]
+        return TensorJacobian(DSsDZ, [1,1], [1,1])
 
 def get_DSDZ(Z, activation_function = 'sigmoid'):
     nZ = Z.shape[0]
@@ -229,12 +293,13 @@ def get_DSDZ(Z, activation_function = 'sigmoid'):
     nS = nZ
     mS = mZ
     DSDZ = np.zeros((nS, mS, mZ, nZ))
+    act = ActivationFunctions.get_derivative(activation_function)
     for i in range(nS):
         for j in range(mS):
             for l in range(mZ):
                 for k in range(nZ):
                     if i==k and l==j:
-                        DSDZ[i][j][l][k] = ActivationFunctions.get_derivative(activation_function)(Z[k][l])
+                        DSDZ[i][j][l][k] = act(Z[k][l])
     return TensorJacobian(DSDZ, [1,1], [1,1])
 
 def get_DZDW(W, A):
@@ -283,8 +348,12 @@ def get_DZDb(b, Z):
                         DZDb[i][j][k] = 1
     return TensorJacobian(DZDb, [1,1], [1,0])
 
-def back_propagate(X, Yhat, As, Zs, Ws, bs, activation_function = 'sigmoid'):
+def back_propagate(X, Yhat, As, Zs, Ws, bs, final_activation_function = 'softmax', activation_function = 'sigmoid'):
     layers = len(As)
+    if final_activation_function == 'softmax':
+        if As[-1].shape[1] == 1:
+            print('Warning: softmax does not work when number of nodes is 1. Swapping to sigmoid.')
+            final_activation_function = 'sigmoid'
     if layers != len(bs):
         raise ValueError('Bad size As and bs')
     DEDWs = []
@@ -296,11 +365,15 @@ def back_propagate(X, Yhat, As, Zs, Ws, bs, activation_function = 'sigmoid'):
     ALminus1 = As[-2]
     bL = bs[-1]
     DEDY = get_DEDY(Y, Yhat)
-    DSLDZL = get_DSDZ(ZL, activation_function= 'sigmoid')
+    if final_activation_function != 'identity':
+        DSLDZL = get_DSDZL(ZL, activation_function = final_activation_function)
     DZLDWL = get_DZDW(WL,ALminus1)
     DZLDbL = get_DZDb(bL,ZL)
 
-    DEDZL = DEDY * DSLDZL
+    if final_activation_function == 'identity':
+        DEDZL = DEDY
+    else:
+        DEDZL = DEDY * DSLDZL
 
     DEDWL = DEDZL * DZLDWL
     DEDbL = DEDZL * DZLDbL
@@ -325,7 +398,7 @@ def back_propagate(X, Yhat, As, Zs, Ws, bs, activation_function = 'sigmoid'):
         bi = bs[-layer-2]
 
         DZiplus1DAi = get_DZDA(Wiplus1,Ai)
-        DSiDZi = get_DSDZ(Zi,activation_function= 'sigmoid')
+        DSiDZi = get_DSDZ(Zi, activation_function = activation_function)
 
         DEmid = DZiplus1DAi * DSiDZi
 
@@ -387,11 +460,15 @@ if __name__ == "__main__":
     Ws, bs = init_weights([5,2,3,2],1)
     As2, Zs = forward_propagate(X, Ws, bs, 'sigmoid')
 
-    DEDWs, DEDbs = back_propagate(X, As2[-1], As, Zs, Ws, bs, activation_function = 'sigmoid')
+    DEDWs, DEDbs = back_propagate(X, As2[-1], As, Zs, Ws, bs, final_activation_function='softmax', activation_function = 'sigmoid')
 
     for i, DEDW in enumerate(DEDWs):
         print(DEDW)
         print(DEDbs[i])
+
+    print(As[-1])
+    print(softmax(As[-1])[:,1])
+    print(softmax(As[-1]))
 
 
     
