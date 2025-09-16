@@ -266,6 +266,101 @@ def get_DEDY(Y,Yhat):
     return TensorJacobian(DEDY, [0,0], [1,1])
 
 def get_DSDZL(Z, activation_function='softmax'):
+    """
+    Derivative of softmax activation wrt Z (final layer).
+    Shape: (nZ, mZ, mZ, nZ), index meaning [i, j, l, k]
+    If not softmax, falls back to get_DSDZ.
+    """
+    if activation_function != 'softmax':
+        return get_DSDZ(Z, activation_function=activation_function)
+
+    nZ, mZ = Z.shape
+    S = ActivationFunctions.get('softmax')(Z)  # (nZ, mZ)
+
+    # Build Jacobian per column: diag(s) - s s^T  -> shape (nZ, nZ, mZ)
+    I = np.eye(nZ)[:, :, None]  # (nZ, nZ, 1)
+    S3 = S[None, :, :]          # (1, nZ, mZ)
+    J = I * S3 - np.einsum('im,jm->ijm', S, S)   # (nZ, nZ, mZ)
+
+    # Expand J into (i, j, l, k) with l==j
+    DSsDZ = np.zeros((nZ, mZ, mZ, nZ))
+    # For each column j, when l==j, copy J[:, :, j]
+    # We want DSsDZ[i, j, l=j, k] = J[i, k, j]
+    DSsDZ[:, np.arange(mZ), np.arange(mZ), :] = np.moveaxis(J, 2, 1)
+
+    return TensorJacobian(DSsDZ, [1, 1], [1, 1])
+
+
+def get_DSDZ(Z, activation_function='sigmoid'):
+    """
+    Derivative of a pointwise activation (sigmoid/tanh/relu) wrt Z.
+    Shape: (nZ, mZ, mZ, nZ), index meaning [i, j, l, k]
+    Non-zero only when i==k and l==j.
+    """
+    nZ, mZ = Z.shape
+    deriv = ActivationFunctions.get_derivative(activation_function)(Z)  # (nZ, mZ)
+
+    DSDZ = np.zeros((nZ, mZ, mZ, nZ))
+    for j in range(mZ):
+        # For each column j, place diagonal of deriv[:, j] at l==j
+        DSDZ[:, j, j, :] = np.diag(deriv[:, j])
+
+    return TensorJacobian(DSDZ, [1, 1], [1, 1])
+
+
+def get_DZDW(W, A):
+    """
+    Derivative of Z = W A  wrt W.
+    Inputs:
+      W shape: (nW, mW)
+      A shape: (mW, mZ)
+    Returns shape: (nZ, mZ, mW, nW) where nZ == nW, index [i,j,l,k]
+    Non-zero when i==k, value = A[l,j]
+    """
+    nW, mW = W.shape
+    mZ = A.shape[1]
+    # Use einsum to build tensor in one shot
+    DZDW = np.einsum('lj,ik->ijlk', A, np.eye(nW))  # shape (nW, mZ, mW, nW)
+
+    return TensorJacobian(DZDW, [1, 1], [1, 1])
+
+
+def get_DZDA(W, A):
+    """
+    Derivative of Z = W A wrt A.
+    Inputs:
+      W shape: (nZ, nA)
+      A shape: (nA, mA)
+    Returns shape: (nZ, mZ, mA, nA) where mZ == mA, index [i,j,l,k]
+    Non-zero when l == j, value = W[i,k]
+    """
+    nA, mA = A.shape
+    nZ = W.shape[0]
+    # Build with broadcasting
+    I = np.eye(mA)[None, :, :, None]   # (1, mA, mA, 1), l==j
+    W_exp = W[:, None, None, :]        # (nZ, 1, 1, nA)
+    DZDA = W_exp * I                    # (nZ, mA, mA, nA)
+
+    return TensorJacobian(DZDA, [1, 1], [1, 1])
+
+
+def get_DZDb(b, Z):
+    """
+    Derivative of Z = W A + b wrt b.
+    Inputs:
+      b shape: (nb, 1)
+      Z shape: (nZ, mZ)
+    Returns shape: (nZ, mZ, nb), index [i, j, k]
+    Non-zero when i == k, value = 1
+    """
+    nZ, mZ = Z.shape
+    nb = b.shape[0]
+
+    DZDb = np.broadcast_to(np.eye(nZ)[:, None, :], (nZ, mZ, nb))
+    return TensorJacobian(DZDb, [1, 1], [1, 0])
+
+
+def get_DSDZL_naive2(Z, activation_function='softmax'):
     if activation_function != 'softmax':
         return get_DSDZ(Z, activation_function=activation_function)
     else:
@@ -286,7 +381,7 @@ def get_DSDZL(Z, activation_function='softmax'):
         return TensorJacobian(DSsDZ, [1, 1], [1, 1])
 
 
-def get_DSDZ(Z, activation_function='sigmoid'):
+def get_DSDZ_naive2(Z, activation_function='sigmoid'):
     nZ, mZ = Z.shape
     act_deriv = ActivationFunctions.get_derivative(activation_function)(Z)  # (nZ, mZ)
 
@@ -298,7 +393,7 @@ def get_DSDZ(Z, activation_function='sigmoid'):
     return TensorJacobian(DSDZ, [1, 1], [1, 1])
 
 
-def get_DZDW(W, A):
+def get_DZDW_naive2(W, A):
     """
     Derivative of Z = W A wrt W
     Shapes:
@@ -319,7 +414,7 @@ def get_DZDW(W, A):
     return TensorJacobian(DZDW, [1, 1], [1, 1])
 
 
-def get_DZDA(W, A):
+def get_DZDA_naive2(W, A):
     """
     Derivative of Z = W A wrt A
     Shapes:
@@ -339,7 +434,7 @@ def get_DZDA(W, A):
     return TensorJacobian(DZDA, [1, 1], [1, 1])
 
 
-def get_DZDb(b, Z):
+def get_DZDb_naive2(b, Z):
     """
     Derivative of Z = W A + b wrt b
     Shapes:

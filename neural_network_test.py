@@ -31,13 +31,14 @@ if __name__ == '__main__':
 
     # Training setup
     activations = {
-        'final_activation_function': 'identity',
+        'final_activation_function': 'sigmoid', # Values between 0 and 1
         'activation_function': 'sigmoid'
     }
     As, Zs = nn.forward_propagate(X_train, Ws, bs, **activations)
 
-    iterations = 1000
+    iterations = 100000
     losses = []
+    snapshots = {}
 
     for it in range(iterations):
         # Backpropagation
@@ -57,24 +58,33 @@ if __name__ == '__main__':
         loss = nn.columnwise_mse(Y_pred, Y_train)
         losses.append(loss)
 
+        # Save snapshots for plotting
         if it % (iterations // 10) == 0:
             print(f"Iteration {it+1}/{iterations}, Loss = {loss:.6f}")
+            A_curve, _ = nn.forward_propagate(X_eval, Ws, bs, **activations)
+            snapshots[it+1] = A_curve[-1].flatten()
 
-    # Evaluate on smooth curve
+    # Final prediction
     A_curve, _ = nn.forward_propagate(X_eval, Ws, bs, **activations)
     Y_curve_pred = A_curve[-1]
 
     # Plot fit
     plt.figure(figsize=(8, 5))
-    plt.plot(x_curve, y_curve, label="True sin(x)", color="blue")
-    plt.scatter(x_random, y_random, color="red", zorder=5, label="Training points")
-    plt.plot(x_curve, Y_curve_pred.flatten(), label="NN Prediction", color="green")
+    plt.plot(x_curve, y_curve, label="True sin(x)", color="black")  # black true curve
+    plt.scatter(x_random, y_random, color="red", s=15, zorder=5, label="Training points")  # smaller red circles
+
+    # Plot snapshots with low opacity
+    for it, y_snapshot in snapshots.items():
+        plt.plot(x_curve, y_snapshot, alpha=0.3, label=f"Iter {it}")
+
+    # Plot final
+    plt.plot(x_curve, Y_curve_pred.flatten(), label="Final NN Prediction", color="green")
     plt.xlabel("x")
     plt.ylabel("y")
     plt.title("Neural Network fitting sin(x)")
     plt.legend()
     plt.grid(True)
-    plt.show()
+    #plt.show()
 
     # Plot training loss
     plt.figure()
@@ -83,7 +93,7 @@ if __name__ == '__main__':
     plt.ylabel("MSE Loss")
     plt.title("Training Loss (sin test)")
     plt.grid(True)
-    plt.show()
+    #plt.show()
 
 
     # ==========================================================
@@ -119,8 +129,9 @@ if __name__ == '__main__':
     }
     As, Zs = nn.forward_propagate(T_train, Ws, bs, **activations)
 
-    iterations = 100
+    iterations = 1000
     losses = []
+    snapshots = {}
 
     for it in range(iterations):
         # Backpropagation
@@ -129,8 +140,8 @@ if __name__ == '__main__':
         # Gradient descent step
         Ws_gd = [gd.GradientDescent(W) for W in Ws]
         bs_gd = [gd.GradientDescent(b) for b in bs]
-        Ws = [W.gradient_descent_step(DEDWs[i], rate_parameter=0.05) for i, W in enumerate(Ws_gd)]
-        bs = [b.gradient_descent_step(DEDbs[i], rate_parameter=0.05) for i, b in enumerate(bs_gd)]
+        Ws = [W.gradient_descent_step(DEDWs[i], rate_parameter=0.05, momentum_parameter=0.2) for i, W in enumerate(Ws_gd)]
+        bs = [b.gradient_descent_step(DEDbs[i], rate_parameter=0.05, momentum_parameter=0.2) for i, b in enumerate(bs_gd)]
 
         # Forward pass
         As, Zs = nn.forward_propagate(T_train, Ws, bs, **activations)
@@ -140,25 +151,34 @@ if __name__ == '__main__':
         loss = nn.columnwise_mse(Y_pred, Y_train)
         losses.append(loss)
 
+        # Save snapshots
         if it % (iterations // 10) == 0:
             print(f"Iteration {it+1}/{iterations}, Loss = {loss:.6f}")
+            A_curve, _ = nn.forward_propagate(T_eval, Ws, bs, **activations)
+            snapshots[it+1] = A_curve[-1]
 
-    # Evaluate on smooth grid
+    # Final prediction
     A_curve, _ = nn.forward_propagate(T_eval, Ws, bs, **activations)
     Y_curve_pred = A_curve[-1]
 
     # Plot XY projection
     plt.figure(figsize=(7, 7))
-    plt.plot(X_curve, Y_curve, label="True helix projection", color="blue")
-    plt.scatter(x_random, y_random, color="red", s=10, alpha=0.6, label="Training points")
-    plt.plot(Y_curve_pred[0], Y_curve_pred[1], label="NN Prediction", color="green", linestyle="--")
+    plt.plot(X_curve, Y_curve, label="True helix projection", color="black")  # black curve
+    plt.scatter(x_random, y_random, color="red", s=15, alpha=0.6, label="Training points")  # smaller red points
+
+    # Plot snapshots with low opacity
+    for it, Y_snapshot in snapshots.items():
+        plt.plot(Y_snapshot[0], Y_snapshot[1], alpha=0.3, label=f"Iter {it}")
+
+    # Final prediction
+    plt.plot(Y_curve_pred[0], Y_curve_pred[1], label="Final NN Prediction", color="green", linestyle="--")
     plt.xlabel("x = t cos t")
     plt.ylabel("y = t sin t")
     plt.title("Neural Network fitting helix projection")
     plt.legend()
     plt.axis("equal")
     plt.grid(True)
-    plt.show()
+    #plt.show()
 
     # Plot training loss
     plt.figure()
@@ -167,4 +187,6 @@ if __name__ == '__main__':
     plt.ylabel("MSE Loss")
     plt.title("Training Loss (helix test)")
     plt.grid(True)
+    
+    
     plt.show()
