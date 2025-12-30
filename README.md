@@ -7,11 +7,15 @@
 <h1>Gradient Descent Optimiser and Neural Network (Tensor-based Backpropagation)</h1>
 
 <p>
-This project contains a Python implementation of a <strong>gradient descent optimiser</strong>, 
+This project contains a mathematical derivation and Python implementation of a <strong>gradient descent optimiser</strong>, 
 a <strong>fully custom neural network framework</strong>, and a 
 <strong>generalised Jacobian class</strong> for handling tensor derivatives.  
 The framework is built from scratch using <code>NumPy</code>, with tensor-calculus-based backpropagation, 
 and demonstrates training on toy datasets such as <strong>fitting a sine wave</strong> and a <strong>helix projection</strong>.
+</p>
+
+<p>
+The full derivation which was implemented here can be found in <strong><code>NN_Derivation.pdf</code></strong>, along with the assosicated <strong><code>NN_Derivation.tex</code></strong> 
 </p>
 
 <hr>
